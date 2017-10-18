@@ -118,7 +118,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">De-Duper Part #1</h1>
 <h4 class="author"><em>Alexa Dowdell</em></h4>
-<h4 class="date"><em>Wed Oct 18 16:20:05 2017</em></h4>
+<h4 class="date"><em>Wed Oct 18 16:54:08 2017</em></h4>
 
 </div>
 
@@ -151,28 +151,31 @@ samtools view -h output2.bam &gt; output.sam</code></pre>
 <pre><code>Arg parse takes in two arguments -f output.sam file from above and -l defined 
 untrimmed read length
 
-referenceFlag == TRUE
-length = args.length
+referenceFlag == TRUE #set a flag to determine the first read of a new section
+length = args.length #set the untrimmed determined read length from arg parge 
+                     # as length
 
 with open samFile of interest as fh:
   for each line in file:
     function sectionChecker(line) {
       If first read {
-        refPOS = 0
+        refPOS = 0 # initialize a variable refPOS
         Extract alignment POS from column 4 and assign to  variable &quot;refPOS&quot;
         Add line to sectionBuddy, where sectionBuddy is an list containing lines
         with similar POS, each line is a new element in the list.
-        referenceFlag == FALSE
-      }
-      continue (on next read from samFile)
+        referenceFlag == FALSE #all subsequent reads that make it into the 
+                                #sectionBuddy will not be the reference
+      } 
+      continue #on next read from samFile
       else {
-        If POS of current read is within one length of the reference read {
+        If POS of current read is within one 'length' of the reference read {
           Add read to sectionBuddy
         }
         else {
         Signifies end of sectionBuddy, and halt reading in new lines momentarily
         and move to softClippingChecker()
-        referenceFlag == TRUE
+        referenceFlag == TRUE #revert back to default since a new section 
+                              # must begin
         }
     }
 }
@@ -180,12 +183,13 @@ with open samFile of interest as fh:
 
 
 function softClippingChecker(sectionBuddy){
-  refLine = sectionBuddy[0]
-  firstBudLine = sectionBuddy[1]
+  refLine = sectionBuddy[0] # set first line to reference line
+  firstBudLine = sectionBuddy[1] #set second line to firstBuddy or 
+                                # first line of comparison
   refPOS = extract 4th column alignment POS from refLine
   firstBudPOS = extract 4th column alignment POS from firstBudLine
-  If refPOS == firstBudPOS{
-    Continue on to UMIchecker()
+  if refPOS == firstBudPOS{ 
+    Continue on to UMIchecker(refLine, firstBudLine)
   }
   elif refPOS != firstBudPOS{
     firstBudCigar = Extract CIGAR flag of firstBudLine
@@ -196,8 +200,8 @@ function softClippingChecker(sectionBuddy){
       Continue on to UMIchecker(refLine, firstBudLine)
     }
     else{
-      Add firstBudLine to revisedOutput.sam
-      Read in buddyLine = sectionBuddy[2] and repeat process
+      Pass line through function validUMIchecker(firstBudLine)
+      Read in buddyLine = sectionBuddy[i]
     }
   }
   else{
@@ -240,7 +244,7 @@ function UMIchecker(refLine, buddyLine){
     Write refLine to revisedFile.sam
   }
   else {
-    if value in knownUMIheader[buddyUMI] == 0 {
+    if value in knownUMIdict[buddyUMI] == 0 {
       value = buddyPOS
       Update value of knownUMIdict[buddyUMI] = value
       Write refLine, buddyLine to revisedFile.sam
@@ -250,10 +254,44 @@ function UMIchecker(refLine, buddyLine){
       Write refLine to revisedFile.sam
     }
   }
+} 
+
+
+
+function validUMIchecker(line){
+  header = extract 1st column UMI header from line
+  UMI = UMIstripper(header)
+  linePOS = extract fourth column alignment POS
+  if UMI in knownUMIDict {
+      Write line to revisedFile.sam
+      }
+    else {
+      Discard line
+    }
 }
+</code></pre>
+<p>Below is an example SAM input file that may be passed in the <code>-f</code> arg parse argument:</p>
+<pre><code>&lt;QNAME&gt; &lt;FLAG&gt; &lt;RNAME&gt; &lt;POS&gt; &lt;MAPQ&gt; &lt;CIGAR&gt; &lt;MRNM&gt; &lt;MPOS&gt; &lt;ISIZE&gt; &lt;SEQ&gt;
 
+SRR035022.2621862:AACGCCAT 163 16 50 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AACGCCAT 163 16 50 37 22S54M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AACGCCAT 163 16 60 37 10S66M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AACGCCAT 163 16 72 37 22S54M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AAGGTACG 163 16 72 37 22S54M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AAGGTACG 163 16 75 37 25S54M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:ACACAGAG 163 16 159 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:ACACAGAG 163 16 167 37 8S68M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AATTCCGG 163 16 180 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AATTCCGG 163 16 185 37 5S71M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:ACGAAGGT 163 16 306 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC </code></pre>
+<p>After the PCR duplicate removel code is run on the input SAM file, an output file called <code>revisedFile.sam</code> would be created containing the following:</p>
+<pre><code>&lt;QNAME&gt; &lt;FLAG&gt; &lt;RNAME&gt; &lt;POS&gt; &lt;MAPQ&gt; &lt;CIGAR&gt; &lt;MRNM&gt; &lt;MPOS&gt; &lt;ISIZE&gt; &lt;SEQ&gt;
 
-
+SRR035022.2621862:AACGCCAT 163 16 50 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AAGGTACG 163 16 72 37 22S54M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:ACACAGAG 163 16 159 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:AATTCCGG 163 16 180 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
+SRR035022.2621862:ACGAAGGT 163 16 306 37 76M = 156 179 CCAACCCAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCGACCCTCACCCTCACCC 
 </code></pre>
 </div>
 
