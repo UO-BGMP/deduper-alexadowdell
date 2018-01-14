@@ -6,8 +6,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description="DeDuper: Removes all PCR duplicates from a sorted SAM file. Identifies the chromosome, start position adjusted by soft clipping in the cigar strand, strand, and UMI for each read and uses those parameters to classify a duplicate.")
 parser.add_argument("-f", "--file", help="Required parameter. Please pass a SORTED SAM file", required=True, type=str)
-parser.add_argument("-p", "--paired", help="Optional parameter designates the file contains paired end reads. If paired end pass the parameter 'True'", required=False, type=bool, default=False)
-parser.add_argument("-u", "--umis", help="Optional paramter designates file passed contains a list of valid UMIs. The file specified must be structured one UMI per line. Not specifying this parameter resorts to the program handling 'randomers'. In the case of randomers, randomers that include 'N' will be excluded from the output file.", required=False, type=str, default='')
+parser.add_argument("-p", "--paired", help="Optional parameter designates the file contains paired end reads. If paired end, pass the parameter 'True'", required=False, type=bool, default=False)
+parser.add_argument("-u", "--umis", help="Optional parameter designates the file passed contains a list of valid UMIs. The file specified must be structured one UMI per line. Not specifying this parameter resorts to the program handling 'randomers'. In the case of randomers, randomers that include 'N' will be excluded from the output file.", required=False, type=str, default='')
 parser.add_argument("-read_kept", "--read_kept", 
                     help="Optional parameter to specify the read to keep in the event of duplicates. Specifying 'Q' returns the read with the highest mapping quality. Default, by not specifying the parameter, returns the first read encountered in a pair/group of duplicates.", 
                     required=False, type=str, default='')
