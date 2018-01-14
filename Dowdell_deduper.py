@@ -6,8 +6,9 @@ import argparse
 
 parser = argparse.ArgumentParser(description="DeDuper: Removes all PCR duplicates from a sorted SAM file. Identifies the chromosome, start position adjusted by soft clipping in the cigar strand, strand, and UMI for each read and uses those parameters to classify a duplicate.")
 parser.add_argument("-f", "--file", help="Required parameter. Please pass a SORTED SAM file", required=True, type=str)
-parser.add_argument("-p", "--paired", help="Optional parameter designates the file contains paired end reads. If paired end pass the parameter 'True'", required=False, type=bool, default=False)
-parser.add_argument("-u", "--umis", help="Optional paramter designates file passed contains a list of valid UMIs. The file specified must be structured one UMI per line. Not specifying this parameter resorts to the program handling 'randomers'. In the case of randomers, randomers that include 'N' will be excluded from the output file.", required=False, type=str, default='')
+parser.add_argument("-p", "--paired", help="Optional parameter designates the file contains paired end reads. If paired end, pass the parameter 'True'", required=False, type=bool, default=False)
+parser.add_argument("-u", "--umis", 
+                    help="Optional parameter designates the file passed contains a list of valid UMIs. The file specified must be structured one UMI per line. Not specifying this parameter resorts to the program handling 'randomers'. In the case of randomers, randomers that include 'N' will be excluded from the output file.", required=False, type=str, default='')
 parser.add_argument("-read_kept", "--read_kept", 
                     help="Optional parameter to specify the read to keep in the event of duplicates. Specifying 'Q' returns the read with the highest mapping quality. Default, by not specifying the parameter, returns the first read encountered in a pair/group of duplicates.", 
                     required=False, type=str, default='')
@@ -33,9 +34,11 @@ duplicate_flag = args.read_kept
 def valid_umisList(u):
     '''Creates and returns a list of valid UMIs from UMI file passed in parameter argument'''
     
-    umis_list = [] #initiatilize dictionary of known UMIs
+    #Initiatilize dictionary of known UMIs
+    umis_list = [] 
     with open(u, 'r') as valid_umiFile:
-        umis_list = open(u).read().splitlines() #save each UMI as a new element in the list of known UMIs while removing new line characters/tabs
+        #Save each UMI as a new element in the list of known UMIs while removing new line characters/tabs
+        umis_list = open(u).read().splitlines() 
         return umis_list    
 
         
@@ -43,13 +46,17 @@ def bit_checker(bit, p):
     '''Takes the bitwise flag and checks it for strandedness. Assumes read is 
     mapped otherwise returns "None" and data are single-end. Returns "+" or "-" depending on strand.'''
     
-    if (bit & 4) == 4: #if bit is equal to 4 the read is unmapped and therefore we dont want to continue with that read
+    #If bit is equal to 4 the read is unmapped and therefore we dont want to continue with that read
+    if (bit & 4) == 4: 
         return None
     strand = "+"
-    if (bit & 16) == 16: #changes strand if bit 16 is set
+    
+    #Changes strand if bit 16 is set
+    if (bit & 16) == 16: 
         strand = "-"            
     return strand 
-
+    
+    # For paired end compatibility
     if p == True:
         if (bit & 40) == 40 and (bit & 80) != 80:
             strandedness = 1
@@ -59,7 +66,7 @@ def bit_checker(bit, p):
     
     
 def valid_UMI_checker(currentUMI, umisList):
-    '''When passed a single UMI extracted from a single SAM file read (self.umi) and a list of known UMIs, 
+    '''When passed a single UMI extracted from a single SAM file read and a list of known UMIs, 
     function returns True if the read has a valid UMI, confirmed in the list. Otherwise, returns False. '''
     
     if currentUMI in umisList:
@@ -72,6 +79,7 @@ def adjust_softClipping(cigar):
     '''Takes in a single line's cigar parameter. The function evaluates the cigar for soft clipping present in
     the beginning of the read, specifically the first two indexes. Returns the number of positions soft clipped as
     an integer'''
+    
     amt_adjs = 0
     if cigar[1]=="S":
         amt_adjs=cigar[0]        
@@ -106,11 +114,12 @@ outputFile = f.replace(newFile, string_deDuped)
 invalidUMI_ctr = 0
 validUMI_ctr = 0
 duplicate_ctr = 0
+n_ctr = 0
 current_chromosome = ""
-referenceDict = {} #Key: (umi, adj_pos, strand) as tuple
+referenceDict = {} #{Key:Value}
+                   #Key: (umi, adj_pos, strand) as tuple
                    #Value: raw line
 umiN_purgatory = []
-
 
 with open(f, "r") as fh, open(outputFile, "w+") as output:
     i = 0
@@ -244,8 +253,12 @@ with open(f, "r") as fh, open(outputFile, "w+") as output:
                                     # Add current line to dictionary to replace one with lower mapping quality
                                     referenceDict[tupleKey] = line
                         else:
-                            #Not a duplicate line, add to dictionary
-                            referenceDict[tupleKey] = line 
+                            if "N" in umi:
+                                umiN_purgatory.append(line)
+                                n_ctr+=1
+                            else:
+                                #Not a duplicate line, add to dictionary
+                                referenceDict[tupleKey] = line 
                             
                     #Duplicate kept flag not specified, defaults to first read being kept
                     else: 
@@ -258,7 +271,7 @@ with open(f, "r") as fh, open(outputFile, "w+") as output:
                             #If current UMI contains an 'N', toss the read, the randomer is invalid
                             if "N" in umi:
                                 umiN_purgatory.append(line)
-                                invalidUMI_ctr+=1
+                                n_ctr+=1
                             else:
                                 #Not a duplicate line, add to dictionary
                                 referenceDict[tupleKey] = line 
@@ -278,7 +291,7 @@ with open(f, "r") as fh, open(outputFile, "w+") as output:
 #####################################################################################################################
 ############################### Print counters for debugging and reassurance ########################################
 #####################################################################################################################
-
+print("Randomers with 'N':\t", n_ctr)
 print("Invalid UMIs:\t\t", invalidUMI_ctr)           
 print("Valid UMIs:\t\t", validUMI_ctr) 
 print("Header lines:\t\t", len(header))
